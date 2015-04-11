@@ -137,40 +137,78 @@ public:
 	~Position(){};
 };
 
+struct Autori{
+	int brAutora;
+	string *autori;
+	friend ostream& operator<<(ostream &it, const Autori *a)
+	{
+		for (int i = 0; i < a->brAutora; i++){
+			it << a->autori[i]; 
+			if (a->brAutora - 1 != i) it << ", ";
+			else it << ". ";
+		}
+		return it;
+	}
+	Autori(int br, string *autor) :brAutora(br), autori(autor){}
+	friend bool operator==(const Autori &a1, const Autori &a2)
+	{
+		bool flag = false;
+		if (a1.brAutora == a2.brAutora)
+		{
+			flag = true;
+			for (int i = 0; i < a1.brAutora; i++)
+			{
+				if (a1.autori[i] != a2.autori[i]) { flag = false; break; }
+			}
+		}
+		return flag;
+	}
+};
+
+struct ISBN
+{
+	char isbn10[10];
+	char isbn13[13];
+};
 class Book{
-	int podatakOIzdanju;
+	double brojIzdanja;
 	BookCondition condition;
 	BorrowingPosition *p;
 	string naziv;
 	int nazivIzdavaca;
 	int bookID;
-	string *autor;
-	//int wrapID = 0;
-	int godizd, brAutora;
+	Autori *autor;
+	int wrapID = -1;
+	int godizd;
+	ISBN isbn; //dodaj u konstruktor;
+	string zanr; // dodaj
+	string jezik; //dodaj
 public:
+	string getZanr()const { return zanr; }
+	string getLang()const { return jezik; }
+
+	Autori* getAutor()const { return autor; }
+	void addWrapper(int id){ wrapID = id; }
+	int readWrapper()const { return wrapID; }
 	~Book()
 	{
 		p = nullptr;
 		autor = nullptr;
 	}
-	Book(BookCondition bc, BorrowingPosition *pp, string naz, int godinaizd, string *autori, string nazivIzd, int brautora, int podatakOIZD) :
-		p(pp), naziv(naz), godizd(godinaizd), condition(bc), autor(autori), brAutora(brautora), podatakOIzdanju(podatakOIZD){
+	Book(BookCondition bc, BorrowingPosition *pp, string naz, int godinaizd, Autori *aut ,string nazivIzd, double podatakOIZD) :
+		p(pp), naziv(naz), godizd(godinaizd), condition(bc), autor(aut), brojIzdanja(podatakOIZD){
 		nazivIzdavaca = set.addPublisher(nazivIzd);
 	}
 	void addBookID(int bkid){
 		bookID = bkid;
 	}
 	void easyPrint(){
-		cout << naziv << "," << set.find(nazivIzdavaca) << "-";
-		for (int i = 0; i < brAutora; i++) cout << autor[i] << ", ";
-		cout << "Godina Izdanja " << godizd << endl;
+		cout << naziv << "," << set.find(nazivIzdavaca) << "-" << autor << "Godina Izdanja " << godizd << endl;
 	}
 	void pisi(ostream &it)const{
-		it << naziv << "-";
-		for (int i = 0; i < brAutora; i++) { it << autor[i]; if (i < brAutora - 1) cout << ", "; }
-		it << " Izdao: " << set.find(nazivIzdavaca) << ". " << endl;
-		it << "Stanje: " << niz[condition] << "(" << godizd << ") ID: " << bookID << endl;
-		it << p << endl;//dog cemo se
+		it << naziv << "-"<<autor<< " Izdao: " << set.find(nazivIzdavaca) << ". " << endl;
+		it << "Stanje: " << niz[condition] << "(" << godizd << ") "<<"broj Izdanja: "<<brojIzdanja<<" ID: " << bookID << endl;
+		it << p << endl;
 	}
 	friend ostream& operator<<(ostream &it, const Book *knjiga){
 		knjiga->pisi(it);
@@ -242,7 +280,46 @@ public:
 
 static const int T = 100;
 
+class Result
+{
+	Book **knjige;
+	int kap, num;
+public:
+	void more()
+	{
+		int kapNew = 2 * kap;
+		Book **knjigeNew = new Book*[kapNew];
+		for (int i = 0; i < num; i++)
+		{
+			knjigeNew[i] = knjige[i];
+			knjige[i] = nullptr;
+		}
+		delete knjige;
+		knjige = knjigeNew;
+		kap = kapNew;
+	}
+	Result() :kap(10), num(0)
+	{
+		knjige = new Book*[10];
+	}
+	void addToResult(Book *knj)
+	{
+		if (num == kap) more();
+		knjige[num++] = knj;
+	}
+	int getNum()const { return num; }
+	friend ostream& operator<<(ostream &it, const Result *r)
+	{
+		for (int i = 0; i < r->getNum(); i++)
+		{
+			it << r->knjige[i];
+		}
+		return it;
+	}
+};
+
 class BookCollection{
+	int wrapperID = 0;
 	class BookWrapper{
 		/*struct cmpclass{
 		bool operator()(const Book &levi, const Book &desni){
@@ -254,6 +331,16 @@ class BookCollection{
 		//string name;
 		Book *vector[T];
 	public:
+		bool IDin(int bookID)const {
+			for (int i = 0; i < num; i++)
+			{
+				if (vector[i]->getBookID() == bookID) return true;
+			}
+			return false;
+		}
+		string wrapperName()const { return vector[0]->getBooksName(); }
+		Autori* wrapperAutors() const { return vector[0]->getAutor(); }
+		string wrapperPublisher()const { return vector[0]->getPublishersName(); }
 		int zamena()
 		{
 			int t = 0;
@@ -319,25 +406,42 @@ class BookCollection{
 		BookWrapper(Book *first) :num(1)
 		{
 			vector[0] = first;
-			myID = first->getBookID();
+			myID = first->readWrapper();
 		}
-		void removeBook(){
-			Book* b = getBook();
+		bool check(Book *knjiga)
+		{
+			return vector[0]->getAutor() == knjiga->getAutor() && vector[0]->getBooksName() == knjiga->getPublishersName() && vector[0]->getPublishersName() == knjiga->getPublishersName() && vector[0]->getYear()==knjiga->getYear();
+		}
+		void removeBook(int bookID){
+			Book* b = nullptr;
+			for (int i = 0; i < num; i++)
+			{
+				if (vector[i]->getBookID() == bookID) {
+					b = vector[i];
+					break;
+				}
+			}
 			if (b) b->setCondition(UKLONJENA);
 		}
 		Book* look(){
 			return vector[num - 1];
 		}
-
-		void allDate(Date *d)
+		void fillResult(Result *r)
 		{
 			for (int i = 0; i < num; i++)
-			if (*d == *((Borrowing *)vector[i]->location())->datumVracanja()) cout << vector[i];
+			{
+				r->addToResult(vector[i]);
+			}
+		}
+		void allDate(Date *d, Result *r)
+		{
+			for (int i = 0; i < num; i++)
+			if (*d == *((Borrowing *)vector[i]->location())->datumVracanja()) r->addToResult(vector[i]);
 		}
 
-		void allCondition(BookCondition c){
+		void allCondition(BookCondition c,Result *r){
 			for (int i = 0; i < num; i++)
-			if (c == vector[i]->getCondition()) cout << vector[i];
+			if (c == vector[i]->getCondition()) r->addToResult(vector[i]);
 		}
 
 	};
@@ -349,11 +453,20 @@ public:
 	}
 	void addBook(Book *knjiga)
 	{
-		map<int, BookWrapper*>::iterator it = collection.find(knjiga->getBookID());
-		if (it == collection.end())
-			collection.emplace(knjiga->getBookID(), new BookWrapper(knjiga));
-		else
-			it->second->addBook(knjiga);
+		bool bookPlaced = false;
+		for (map<int, BookWrapper*>::iterator it = collection.begin(); it != collection.end(); ++it)
+		{
+			if (it->second != nullptr && it->second->check(knjiga)) {
+				knjiga->addWrapper(it->second->myIDD());
+				it->second->addBook(knjiga);
+				bookPlaced = true;
+				break;
+			}
+		}
+		if (!bookPlaced) {
+			knjiga->addWrapper(wrapperID++);
+			collection.emplace(knjiga->readWrapper(), new BookWrapper(knjiga));
+		}
 
 	}
 	int zamena(){
@@ -376,42 +489,49 @@ public:
 	}
 	void removeBook(int bookID)
 	{
-		map<int, BookWrapper*>::iterator it = collection.find(bookID);
-		if (it == collection.end()) return;
-		it->second->removeBook();
+		for (map<int, BookWrapper*>::iterator it = collection.begin(); it != collection.end(); ++it)
+		if (it->second->IDin(bookID))	{
+			it->second->removeBook(bookID);
+			break;
+		}
 	}
 	void printAllBooks()
 	{
 		for (map<int, BookWrapper*>::iterator it = collection.begin(); it != collection.end(); ++it)
 			cout << it->second;
 	}
-
 	Book* lookAtBook(int bookID)
 	{
 		map<int, BookWrapper*>::iterator it = collection.find(bookID);
 		if (it == collection.end()) return nullptr;
 		return it->second->look();
 	}
-	void search_Name(string naziv, string nazizd = "", int godina = 0){
+	Result* search_Name(string naziv, string nazizd = "", int godina = 0){
+		Result *result = new Result();
 		for (map<int, BookWrapper*>::iterator it = collection.begin(); it != collection.end(); ++it)
 		if (naziv == it->second->look()->getBooksName())
 		{
 			if (nazizd != "" && godina != 0){
 				if (nazizd == it->second->look()->getPublishersName() && godina == it->second->look()->getYear())
-					cout << it->second;
+					it->second->fillResult(result);
 			}
-			else cout << it->second;
+			else it->second->fillResult(result);
 
 		}
+		return result;
 	}
-	void search_Date(Date *d){
+	Result* search_Date(Date *d){
+		Result *result = new Result();
 		for (map<int, BookWrapper*>::iterator it = collection.begin(); it != collection.end(); ++it)
 		if (!it->second->look()->location()->isBookInLibrary())
-			it->second->allDate(d);
+			it->second->allDate(d,result);
+		return result;
 	}
-	void search_Condition(BookCondition c){
+	Result* search_Condition(BookCondition c){
+		Result *result = new Result();
 		for (map<int, BookWrapper*>::iterator it = collection.begin(); it != collection.end(); ++it)
-			it->second->allCondition(c);
+			it->second->allCondition(c,result);
+		return result;
 	}
 };
 
@@ -549,13 +669,16 @@ public:
 			delete it->second;
 	}
 	void search_Name(string naziv, string nazizd = "", int godina = 0){
-		books->search_Name(naziv, nazizd, godina);
+		Result *r=books->search_Name(naziv, nazizd, godina);
+		cout << r;
 	}
 	void search_Date(Date *d){
-		books->search_Date(d);
+		Result *r=books->search_Date(d);
+		cout << r;
 	}
 	void search_Condition(BookCondition c){
-		books->search_Condition(c);
+		Result *r=books->search_Condition(c);
+		cout << r;
 	}
 	static void setN(int n){ N = n; }
 	void istekaoRok(Date *datum){
@@ -836,7 +959,6 @@ int main()
 	knjige = new Book*[brKnjiga];
 	for (int i = 0; i < brKnjiga; i++)
 	{
-		//Book(BookCondition bc, BorrowingPosition *pp, string naz, int godinaizd, string *autori, string nazivIzd, int brautora)
 
 		cout << "Unesite sada Naziv knjige, Godinu Izdavanja, Naziv Izdavaca i Broj Autora respektivno" << endl;
 		string s1, s2; int brar, god;
@@ -852,7 +974,8 @@ int main()
 		cout << "Unesite Podatak O Izdanju(int)" << endl;
 		int podatak;
 		cin >> podatak;
-		knjige[i] = new Book(NIJEBILA, nullptr, s1, god, st, s2, brar, podatak);
+		//Book(BookCondition bc, BorrowingPosition *pp, string naz, int godinaizd, Autori *aut, string nazivIzd, int podatakOIZD) :
+		knjige[i] = new Book(NIJEBILA, nullptr, s1, god, new Autori(brar,st), s2, podatak);
 	}
 
 	while (1)
