@@ -8,9 +8,25 @@
 #include <ostream>
 #include <vector>
 #include <queue>
+#include <ctime>
+#include <stack>
 
 using namespace std;
+
 int bookid = 0, personid = 0;// , publisherIDD = 0;
+
+class NoFile{};
+inline ostream& operator<<(ostream &it, const NoFile *e)
+{
+	it << "Ne postoji datoeka sa takvim imenom" << endl;
+	return it;
+}
+class BadNumber{};
+inline ostream& operator<<(ostream &it, const BadNumber *b)
+{
+	it << "Uneli ste los broj" << endl;
+	return it;
+}
 
 class Member
 {
@@ -33,10 +49,10 @@ public:
 		return it;
 	}
 	void print(ostream &it)const { it << ime << " " << prezime << " " << " ID:" << personID; if (member != nullptr) member->print(it); }
-	Person(string im, string prez) :ime(im), prezime(prez),member(nullptr){}
-	void setMemID(int mem){ member=new Member(mem); }
-	const int myMemID()const 
-	{ 
+	Person(string im, string prez) :ime(im), prezime(prez), member(nullptr){}
+	void setMemID(int mem){ member = new Member(mem); }
+	const int myMemID()const
+	{
 		if (member != nullptr) return member->myMemID();
 		else return -1;
 	}
@@ -106,13 +122,10 @@ public:
 		return (d1>d2 || d1 == d2);
 	}
 };
-enum BookCondition{ NOVA, MALO_OSTECENA, VEOMA_OSTECENA, POTREBNO_ZAMENITI, UKLONJENA, NIJEBILA };
-static string niz[6] = { "NOVA", "MALO OSTECENA", "VEOMA OSTECENA", "POTREBNO ZAMENITI", "UKLONJENA", "VAN BIBLIOTEKE" };
-static BookCondition nizz[6] = { NOVA, MALO_OSTECENA, VEOMA_OSTECENA, POTREBNO_ZAMENITI, UKLONJENA, NIJEBILA };
 
 class BorrowingPosition{
 public:
-	friend ostream& operator<<(ostream &it, BorrowingPosition *p)
+	friend ostream& operator<<(ostream &it, const BorrowingPosition *p)
 	{
 		p->pisi(it);
 		return it;
@@ -137,19 +150,20 @@ public:
 	~Position(){};
 };
 
-struct Autori{
+class Autori{
 	int brAutora;
-	string *autori;
+	string *imena, *prezimena;
+public:
 	friend ostream& operator<<(ostream &it, const Autori *a)
 	{
 		for (int i = 0; i < a->brAutora; i++){
-			it << a->autori[i]; 
+			it << a->imena[i] << " " << a->prezimena[i];
 			if (a->brAutora - 1 != i) it << ", ";
 			else it << ". ";
 		}
 		return it;
 	}
-	Autori(int br, string *autor) :brAutora(br), autori(autor){}
+	Autori(int br, string *im,string *pr) :brAutora(br), imena(im),prezimena(pr){}
 	friend bool operator==(const Autori &a1, const Autori &a2)
 	{
 		bool flag = false;
@@ -158,20 +172,47 @@ struct Autori{
 			flag = true;
 			for (int i = 0; i < a1.brAutora; i++)
 			{
-				if (a1.autori[i] != a2.autori[i]) { flag = false; break; }
+				if (a1.imena[i] != a2.imena[i] || a1.prezimena[i]!= a2.prezimena[i]) { flag = false; break; }
 			}
 		}
 		return flag;
 	}
 };
 
-struct ISBN
+class ISBN
 {
-	char isbn10[10];
-	char isbn13[13];
+	string isbn10;
+	string isbn13;
+	bool tip13;
+public:
+	bool isbn_13()const { return tip13; }
+	ISBN(bool t, string isbn) :tip13(t){
+		if (tip13)
+			isbn13 = isbn;
+		else
+			isbn10 = isbn;
+	}
+	string getISBN()
+	{
+		if (tip13)
+			return isbn13;
+		else 
+			return isbn10;
+	}
+	friend ostream& operator<<(ostream &it, const ISBN &isbn)
+	{
+		if (isbn.tip13)
+			it << isbn.isbn13;
+		else
+			it << isbn.isbn10;
+	}
 };
+
+enum BookCondition{ NOVA, MALO_OSTECENA, VEOMA_OSTECENA, POTREBNO_ZAMENITI, UKLONJENA, NIJEBILA };
+static string niz[6] = { "NOVA", "MALO OSTECENA", "VEOMA OSTECENA", "POTREBNO ZAMENITI", "UKLONJENA", "VAN BIBLIOTEKE" };
+static BookCondition nizz[6] = { NOVA, MALO_OSTECENA, VEOMA_OSTECENA, POTREBNO_ZAMENITI, UKLONJENA, NIJEBILA };
 class Book{
-	double brojIzdanja;
+	int brojIzdanja;
 	BookCondition condition;
 	BorrowingPosition *p;
 	string naziv;
@@ -180,7 +221,7 @@ class Book{
 	Autori *autor;
 	int wrapID = -1;
 	int godizd;
-	ISBN isbn; //dodaj u konstruktor;
+	ISBN *isbn; //dodaj u konstruktor;
 	string zanr; // dodaj
 	string jezik; //dodaj
 public:
@@ -195,9 +236,10 @@ public:
 		p = nullptr;
 		autor = nullptr;
 	}
-	Book(BookCondition bc, BorrowingPosition *pp, string naz, int godinaizd, Autori *aut ,string nazivIzd, double podatakOIZD) :
-		p(pp), naziv(naz), godizd(godinaizd), condition(bc), autor(aut), brojIzdanja(podatakOIZD){
+	Book(BookCondition bc, BorrowingPosition *pp, string naz, int godinaizd, Autori *aut, string nazivIzd, int podatakOIZD,string isbnn,bool tip, string zanrr,string jezikk) :
+		p(pp), naziv(naz), godizd(godinaizd), condition(bc), autor(aut), brojIzdanja(podatakOIZD),jezik(jezikk),zanr(zanrr){
 		nazivIzdavaca = set.addPublisher(nazivIzd);
+		isbn = new ISBN(tip, isbnn);
 	}
 	void addBookID(int bkid){
 		bookID = bkid;
@@ -206,8 +248,8 @@ public:
 		cout << naziv << "," << set.find(nazivIzdavaca) << "-" << autor << "Godina Izdanja " << godizd << endl;
 	}
 	void pisi(ostream &it)const{
-		it << naziv << "-"<<autor<< " Izdao: " << set.find(nazivIzdavaca) << ". " << endl;
-		it << "Stanje: " << niz[condition] << "(" << godizd << ") "<<"broj Izdanja: "<<brojIzdanja<<" ID: " << bookID << endl;
+		it << naziv << "-" << autor << " Izdao: " << set.find(nazivIzdavaca) << ". " << endl;
+		it << "Stanje: " << niz[condition] << "(" << godizd << ") " << "broj Izdanja: " << brojIzdanja << " ID: " << bookID << endl;
 		it << p << endl;
 	}
 	friend ostream& operator<<(ostream &it, const Book *knjiga){
@@ -399,10 +441,9 @@ class BookCollection{
 			if (num >= T) return;
 			vector[num++] = knjiga;
 		}
-		~BookWrapper(){
-			for (int i = 0; i < num; i++)
-				delete vector[i];
-		}
+		//~BookWrapper(){
+		//	delete vector;
+		//}
 		BookWrapper(Book *first) :num(1)
 		{
 			vector[0] = first;
@@ -410,7 +451,7 @@ class BookCollection{
 		}
 		bool check(Book *knjiga)
 		{
-			return vector[0]->getAutor() == knjiga->getAutor() && vector[0]->getBooksName() == knjiga->getPublishersName() && vector[0]->getPublishersName() == knjiga->getPublishersName() && vector[0]->getYear()==knjiga->getYear();
+			return vector[0]->getAutor() == knjiga->getAutor() && vector[0]->getBooksName() == knjiga->getPublishersName() && vector[0]->getPublishersName() == knjiga->getPublishersName() && vector[0]->getYear() == knjiga->getYear();
 		}
 		void removeBook(int bookID){
 			Book* b = nullptr;
@@ -439,7 +480,7 @@ class BookCollection{
 			if (*d == *((Borrowing *)vector[i]->location())->datumVracanja()) r->addToResult(vector[i]);
 		}
 
-		void allCondition(BookCondition c,Result *r){
+		void allCondition(BookCondition c, Result *r){
 			for (int i = 0; i < num; i++)
 			if (c == vector[i]->getCondition()) r->addToResult(vector[i]);
 		}
@@ -506,7 +547,7 @@ public:
 		if (it == collection.end()) return nullptr;
 		return it->second->look();
 	}
-	Result* search_Name(string naziv, string nazizd = "", int godina = 0){
+	Result* search_Name_Book(string naziv, string nazizd = "", int godina = 0){
 		Result *result = new Result();
 		for (map<int, BookWrapper*>::iterator it = collection.begin(); it != collection.end(); ++it)
 		if (naziv == it->second->look()->getBooksName())
@@ -524,13 +565,13 @@ public:
 		Result *result = new Result();
 		for (map<int, BookWrapper*>::iterator it = collection.begin(); it != collection.end(); ++it)
 		if (!it->second->look()->location()->isBookInLibrary())
-			it->second->allDate(d,result);
+			it->second->allDate(d, result);
 		return result;
 	}
 	Result* search_Condition(BookCondition c){
 		Result *result = new Result();
 		for (map<int, BookWrapper*>::iterator it = collection.begin(); it != collection.end(); ++it)
-			it->second->allCondition(c,result);
+			it->second->allCondition(c, result);
 		return result;
 	}
 };
@@ -612,7 +653,7 @@ class Library{
 			}
 			if (bookFound) {
 				cout << "Unesite Poziciju na koju bi vratili knjigu(prvo Prostorija, Ormar pa policu)" << endl;
-				int a, b, c; cin >> a; cin >> b; cin >> c; if (a <= 0 || b <= 0 || c <= 0) exit(-1);
+				int a, b, c; cin >> a; cin >> b; cin >> c; if (a < 0 || b < 0 || c < 0) throw new BadNumber();
 				bb->book()->taken_position(new Position(a, b, c));
 			}
 		}
@@ -668,16 +709,16 @@ public:
 		for (unordered_map<int, Member*>::iterator it = members.begin(); it != members.end(); ++it)
 			delete it->second;
 	}
-	void search_Name(string naziv, string nazizd = "", int godina = 0){
-		Result *r=books->search_Name(naziv, nazizd, godina);
+	void search_Name_Book(string naziv, string nazizd = "", int godina = 0){
+		Result *r = books->search_Name_Book(naziv, nazizd, godina);
 		cout << r;
 	}
 	void search_Date(Date *d){
-		Result *r=books->search_Date(d);
+		Result *r = books->search_Date(d);
 		cout << r;
 	}
 	void search_Condition(BookCondition c){
-		Result *r=books->search_Condition(c);
+		Result *r = books->search_Condition(c);
 		cout << r;
 	}
 	static void setN(int n){ N = n; }
@@ -794,192 +835,421 @@ int Library::N = 10;
 //	it << "Knjiga je u posedu clana: " << a->readMember(memberID) << "  Od: " << begin << "  Do: " << end;
 //	if (!back) it << "  ****NIJE VRACENA****  " << endl;
 //}
-void ispisLjudi(Person **ljudi, int broj, Library *biblioteka, bool mode)
+
+class Instruction{
+
+public:
+	virtual void undo() = 0;
+	virtual ~Instruction(){}
+};
+
+class Ubacivanje_Izbacivanje_Knjiga : public Instruction
 {
-	if (mode) cout << "Unesite Broj ljudi koje bi uclanili sada: ";
-	else cout << "Unesite Broj Ljudi Koje Bi Isclanili sada: ";
-	int k;
-	cin >> k;
-	if (k <= 0) exit(-1);
-	for (int i = 0; i < broj; i++)
+	int bookID;
+	bool ubacivanje;
+public:
+	void undo() override
 	{
-		cout << "Broj: " << i << " Za: " << ljudi[i] << endl;
+		while (true);//radi
 	}
-	for (int i = 0; i < k; i++)
-	{
-		int menu; cin >> menu;
-		if (i<k - 1) cout << ", ";
-		if (menu < 0 || menu >= broj) break;
-		if (mode) ljudi[menu]->setMemID(biblioteka->addMember(ljudi[menu]));
-		else biblioteka->removeMember(ljudi[menu]->myMemID());
-	}
-}
+	Ubacivanje_Izbacivanje_Knjiga(int id,bool opcija):bookID(id),ubacivanje(opcija){}
+	~Ubacivanje_Izbacivanje_Knjiga(){}
+};
 
-void ispisKnjiga(Book **knjige, int broj)
+class Ubacivanje_Izbacivanje_Ljudi : public Instruction
 {
-	for (int i = 0; i < broj; i++)
+	int memberID;
+	bool ubacivanje;
+public:
+	void undo() override
 	{
-		cout << "Broj: " << i << " Za "; knjige[i]->easyPrint();
+		while (true);//radi
 	}
-	cout << "Unesite Broj Koju Knjigu Birate" << endl;
-}
+	Ubacivanje_Izbacivanje_Ljudi(int id, bool opcija) :memberID(id), ubacivanje(opcija){}
+};
 
-void ubacivanjeKnjiga(Library *biblioteka, int broj, Book **knjige, bool mode)
+class Promena_Stanja : public Instruction
 {
-	if (mode) cout << "Unesite Broj Knjiga Koje Zelite Da Ubacite ";
-	else cout << "Unesite Broj Knjiga Koje Zelite Da Izbacite ";
-	int k;
-	cin >> k;
-	if (k <= 0) exit(-1);
-	ispisKnjiga(knjige, broj);
-	for (int i = 0; i < k; i++)
+	int bookID;
+	BookCondition Prethodno, Novo;
+public:
+	void undo() override
 	{
-		int izbor; cin >> izbor;
-		if (izbor <0 || izbor >= k) exit(-1);
-		if (mode) {
-			cout << "Unesite Poziciju Na koju hocete da postavite knjigu(Prvo br.Prostorija, Ormara pa police)" << endl;
-			int pr, ore, po; cin >> pr; cin >> ore; cin >> po;
-			if (pr <= 0 || ore <= 0 || po <= 0) exit(-1);
-			Position *pos = new Position(pr, ore, po);
-			knjige[izbor]->taken_position(pos);
-			knjige[izbor]->setCondition(NOVA); biblioteka->addBook(knjige[izbor]);
-		}
-		else biblioteka->removeBook(knjige[izbor]->getBookID());
+		while (true); //radi
 	}
-}
-
-void pozicija(Book **knjige, int broj)
+	Promena_Stanja(int id, BookCondition prvo, BookCondition drugo) :bookID(id), Prethodno(prvo), Novo(drugo){}
+	~Promena_Stanja(){}
+};
+class Pozajmljivanje_Knjige : public Instruction
 {
-	ispisKnjiga(knjige, broj);
-	int a;
-	cin >> a;
-	if (a < 0 || a >= broj) exit(-1);
-	knjige[a]->position();
-}
-
-void pretrazivanje_knjiga(Library *biblioteka)
-{
-	cout << "Unesite Opciju :" << endl;
-	cout << "1.Pretraga prema nazivu knjige" << endl;
-	cout << "2.Pretraga prema isteku datuma" << endl;
-	cout << "3.Pretraga Prema Stanju knjige" << endl;
-	int menu; cin >> menu;
-	switch (menu)
+	int bookID;
+	int memberID;
+	Date *from, *to;
+public:
+	void undo() override
 	{
-	case 1:{
-			   cout << "Unesite Naziv Knjige" << endl;
-			   string st; cin >> st; cout << endl;
-			   cout << "1.Pretraga Samo po nazivu" << endl;
-			   cout << "2.Po nazivu,izdavacu i godini izdanja " << endl;
-			   int op; cin >> op;
-			   if (op == 2){
-				   cout << "Uneiste Izdavaca i Godinu Izdanja." << endl;
-				   string s; cin >> s; cin >> op;
-				   biblioteka->search_Name(st, s, op);
-			   }
-			   else { biblioteka->search_Name(st); }
-			   break;
+		while (true); //radi
 	}
-	case 2:
-	{
-			  cout << "Unesite Datum Pretrage, Dan, Mesec pa Godinu." << endl;
-			  int dd, mm, yy; cin >> dd; cin >> mm; cin >> yy;
-			  biblioteka->search_Date(new Date(yy, mm, dd));
-			  break;
+	Pozajmljivanje_Knjige(int menu, int knjiga, Date *d1, Date *d2) :memberID(menu), bookID(knjiga), from(d1), to(d2){}
+	~Pozajmljivanje_Knjige(){
+		delete from;
+		delete to;
 	}
-	case 3:
-		cout << "Unesite Neko Od Stanja" << endl;
-		for (int i = 0; i < 6; i++)
-			cout << i << "Za " << niz[i];
-		int b; cin >> b;
-		if (b < 0 || b >= 6) exit(-1);
-		biblioteka->search_Condition(nizz[b]);
-		break;
-	}
-}
-
-void pretrazivanje_clanova(Library *biblioteka)
+};
+class Vracanje_Knjige : public Instruction
 {
-	cout << "Unesite Opciju:" << endl;
-	cout << "1.Zadavanje datuma, provera da li su do tog dana vratili svi koji su trebali" << endl;
-	cout << "2.Zadavanje opsega, provera ko je sve tada pozajmljivao koje knjige." << endl;
-	int menu; cin >> menu;
-	if (menu == 1){
-		cout << "Unesite Datum Pretrage, Dan, Mesec pa Godinu." << endl;
-		int dd, mm, yy; cin >> dd; cin >> mm; cin >> yy;
-		biblioteka->istekaoRok(new Date(yy, mm, dd));
+	int bookID;
+	int memberID;
+	BookCondition stanje;
+public:
+	Vracanje_Knjige(int m, int k, BookCondition st) :bookID(k), memberID(m), stanje(st){}
+	~Vracanje_Knjige(){}
+	void undo() override
+	{
+		while (true);// radi
 	}
-	else {
-		cout << "Unesite Pocetni Datum Pretrage, Dan, Mesec pa Godinu." << endl;
-		int dd, mm, yy; cin >> dd; cin >> mm; cin >> yy;
-		cout << "Unesite krajnji Datum Pretrage, Dan, Mesec pa Godinu." << endl;
-		int dd2, mm2, yy2; cin >> dd2; cin >> mm2; cin >> yy2;
-		biblioteka->izmedju(new Date(yy, mm, dd), new Date(yy2, mm2, dd2));
-	}
-}
+};
 
-
-//void ucitaj(ifstream &dat, string s)
+//class Round_Buffer :private vector<Instruction*>
 //{
-//	char c;
-//	s = "";
-//	while (c != EOF || c != ' ')
-//	{
-//		dat >> c;
-//		s += c;
+//	int head, capacity;
+//public:
+//	Round_Buffer(int cap) :head(0), capacity(cap){}
+//	void undo(){
+//		if (head != 0)
+//		{
+//
+//			(*this)[head]->undo();
+//			delete (*this)[head];
+//			(*this)[head--] = nullptr;
+//		}
 //	}
-//}
+//	void add(Instruction* ins)
+//	{
+//		(*this)[++head] = ins;
+//	}
+//	//void empty()
+//	//{
+//	//	this->empty();// radi li ?
+//	//}
+//};
 
-int main()
+class History:private stack<Instruction*>
 {
-	ifstream dat; //ovo sam ostavio za kraj
-	dat.open("knjige.txt");
-	cout << "Za kreiranje biblioteke potrebno je uneti podrazumevanu vrednost N" << endl;
-	int n; cin >> n;
-	if (n <= 0 || n > 100) exit(-1);
-	Library *biblioteka = new Library();
-	Library::setN(n);
-	cout << "Biblioteka je Kreirana." << endl;
-	cout << "Prvo unesite broj ljudi koje kreirate i sve potrebne podatke za njih.";
-	int num, brKnjiga; cin >> num;
-	if (num <= 0) exit(-1);
-	string s1, s2;
-	Person **ljudi = new Person*[num];
-	for (int i = 0; i < num; i++)
-	{
-		cout << "Unesite Ime i Prezime Osobe: ";
-		cin >> s1; cin >> s2;
-		ljudi[i] = new Person(s1, s2);
-		cout << endl;
+	Instruction* pop(){
+		if (stack<Instruction*>::empty()) return nullptr;
+		Instruction *cur = stack<Instruction*>::top();
+		stack<Instruction*>::pop();
+		return cur;
 	}
-	cout << "Sad unesite broj knjiga koje kreirate i sve potrebne podatke za njih.";
-	Book **knjige;
-	cin >> brKnjiga;
-	if (brKnjiga <= 0) exit(-1);
-	knjige = new Book*[brKnjiga];
-	for (int i = 0; i < brKnjiga; i++)
+public:
+	void undo()
 	{
-
-		cout << "Unesite sada Naziv knjige, Godinu Izdavanja, Naziv Izdavaca i Broj Autora respektivno" << endl;
-		string s1, s2; int brar, god;
-
-		cin >> s1;
-		cin >> god;
-		cin >> s2;
-
-		cin >> brar; string *st = new string[brar];
-		for (int j = 0; j < brar; j++){
-			cout << "Uneiste Autora: "; cin >> st[j];
+		Instruction *cur = this->pop();
+		if (cur != nullptr) cur->undo();
+	}
+	void push(Instruction *ins)
+	{
+		stack<Instruction*>::push(ins);
+	}
+	~History(){
+		while (!stack<Instruction*>::empty())
+		{
+			Instruction * del = this->pop();
+			delete del;
 		}
-		cout << "Unesite Podatak O Izdanju(int)" << endl;
-		int podatak;
-		cin >> podatak;
-		//Book(BookCondition bc, BorrowingPosition *pp, string naz, int godinaizd, Autori *aut, string nazivIzd, int podatakOIZD) :
-		knjige[i] = new Book(NIJEBILA, nullptr, s1, god, new Autori(brar,st), s2, podatak);
 	}
+};
 
-	while (1)
+class Main{
+	History *history; //
+	bool rezim;
+	int num, brKnjiga;
+	Library *biblioteka;
+	Person **ljudi;
+	Book **knjige;
+	ifstream *dnevnik;
+	ofstream *upis;
+	const string currentDateTime() {
+		time_t     now = time(0);
+		struct tm  tstruct;
+		char       buf[80];
+		tstruct = *localtime(&now);
+
+		strftime(buf, sizeof(buf), "%Y-%m-%d, %X", &tstruct);
+
+		return buf;
+	}
+	void ispisLjudi(Person **ljudi, int broj, Library *biblioteka, bool mode)
 	{
+		if (mode)
+		{
+			cout << "Unesite Broj ljudi koje bi uclanili sada: "; 
+			*upis << " Uclanjivanje Ljudi U Biblioteku" << endl;
+		}
+		else {
+			cout << "Unesite Broj Ljudi Koje Bi Isclanili sada: ";
+			*upis << "Isclanjivanje Ljudi Iz Biblioteke" << endl;
+		}
+		int k;
+		cin >> k;
+		if (k <= 0) throw new BadNumber();
+		for (int i = 0; i < broj; i++)
+		{
+			cout << "Broj: " << i << " Za: " << ljudi[i] << endl;
+		}
+		for (int i = 0; i < k; i++)
+		{
+			int menu; cin >> menu;
+			if (i<k - 1) cout << ", ";
+			if (menu < 0 || menu >= broj) throw new BadNumber();
+			if (mode) ljudi[menu]->setMemID(biblioteka->addMember(ljudi[menu]));
+			else biblioteka->removeMember(ljudi[menu]->myMemID());
+
+			history->push(new Ubacivanje_Izbacivanje_Ljudi(menu, mode));
+		}
+	}
+	void ispisKnjiga(Book **knjige, int broj)
+	{
+		for (int i = 0; i < broj; i++)
+		{
+			cout << "Broj: " << i << " Za "; knjige[i]->easyPrint();
+		}
+		cout << "Unesite Broj Koju Knjigu Birate" << endl;
+	}
+	void ubacivanjeKnjiga(Library *biblioteka, int broj, Book **knjige, bool mode)
+	{
+		if (mode) {
+			cout << "Unesite Broj Knjiga Koje Zelite Da Ubacite "; 
+			*upis << " Ubacivanje Knjiga U Biblioteku" << endl;
+		}
+		else {
+			cout << "Unesite Broj Knjiga Koje Zelite Da Izbacite "; 
+			*upis << "Izbacivanje Knjiga Iz Biblioteke" << endl;
+		}
+		int k;
+		cin >> k;
+		if (k <= 0) throw new BadNumber();
+		ispisKnjiga(knjige, broj);
+		for (int i = 0; i < k; i++)
+		{
+			int izbor; cin >> izbor;
+			if (izbor < 0 || izbor >= num) throw new BadNumber();
+			if (mode) {
+				cout << "Unesite Poziciju Na koju hocete da postavite knjigu(Prvo br.Prostorija, Ormara pa police)" << endl;
+				int pr, ore, po; cin >> pr; cin >> ore; cin >> po;
+				if (pr <= 0 || ore <= 0 || po <= 0)throw new BadNumber();
+				Position *pos = new Position(pr, ore, po);
+				knjige[izbor]->taken_position(pos);
+				knjige[izbor]->setCondition(NOVA); biblioteka->addBook(knjige[izbor]);
+			}
+			else biblioteka->removeBook(knjige[izbor]->getBookID());
+
+			history->push(new Ubacivanje_Izbacivanje_Knjiga(izbor, mode));
+		}
+	}
+	void pozicija(Book **knjige, int broj)
+	{
+		ispisKnjiga(knjige, broj);
+		int a;
+		cin >> a;
+		if (a < 0 || a >= broj) throw new BadNumber();
+		knjige[a]->position();
+	}
+	void pretrazivanje_knjiga(Library *biblioteka)
+	{
+		cout << "Unesite Opciju :" << endl;
+		cout << "1.Pretraga prema nazivu knjige" << endl;
+		cout << "2.Pretraga prema isteku datuma" << endl;
+		cout << "3.Pretraga Prema Stanju knjige" << endl;
+		int menu; cin >> menu;
+		switch (menu)
+		{
+		case 1:
+		{
+				  cout << "Unesite Naziv Knjige" << endl;
+				  string st; cin >> st; cout << endl;
+				  cout << "1.Pretraga Samo po nazivu" << endl;
+				  cout << "2.Po nazivu,izdavacu i godini izdanja " << endl;
+				  int op; cin >> op;
+				  if (op == 2)
+				  {
+					  cout << "Uneiste Izdavaca i Godinu Izdanja." << endl;
+					  string s; cin >> s; cin >> op;
+					  biblioteka->search_Name_Book(st, s, op);
+				  }
+				  else { biblioteka->search_Name_Book(st); }
+				  *upis << " Pretraga Po Nazivu knjige" << endl;
+				  break;
+		}
+		case 2:
+		{
+				  cout << "Unesite Datum Pretrage, Dan, Mesec pa Godinu." << endl;
+				  int dd, mm, yy; cin >> dd; cin >> mm; cin >> yy;
+				  biblioteka->search_Date(new Date(yy, mm, dd));
+				  *upis << " Pretraga Po Datumu Pozajmice" << endl;
+				  break;
+		}
+		case 3:
+		{
+				  cout << "Unesite Neko Od Stanja" << endl;
+				  for (int i = 0; i < 6; i++)
+					  cout << i << "Za " << niz[i];
+				  int b; cin >> b;
+				  if (b < 0 || b >= 6) throw new BadNumber();
+				  biblioteka->search_Condition(nizz[b]);
+				  *upis << " Pretraga Po Stanju Knjige" << endl;
+				  break;
+		}
+		}
+	}
+	void pretrazivanje_clanova(Library *biblioteka)
+	{
+		cout << "Unesite Opciju:" << endl;
+		cout << "1.Zadavanje datuma, provera da li su do tog dana vratili svi koji su trebali" << endl;
+		cout << "2.Zadavanje opsega, provera ko je sve tada pozajmljivao koje knjige." << endl;
+		int menu; cin >> menu;
+		if (menu == 1){
+			cout << "Unesite Datum Pretrage, Dan, Mesec pa Godinu." << endl;
+			int dd, mm, yy; cin >> dd; cin >> mm; cin >> yy;
+			biblioteka->istekaoRok(new Date(yy, mm, dd));
+			*upis << " Pretraga Clanova Na Osnovu Isteka Roka Pozajmice" << endl;
+		}
+		else {
+			cout << "Unesite Pocetni Datum Pretrage, Dan, Mesec pa Godinu." << endl;
+			int dd, mm, yy; cin >> dd; cin >> mm; cin >> yy;
+			cout << "Unesite krajnji Datum Pretrage, Dan, Mesec pa Godinu." << endl;
+			int dd2, mm2, yy2; cin >> dd2; cin >> mm2; cin >> yy2;
+			biblioteka->izmedju(new Date(yy, mm, dd), new Date(yy2, mm2, dd2));
+			*upis << " Pretraga Clanova Na Osnovu Datuma Pozajmljivanja U Opsegu Datuma " << endl;
+		}
+	}
+	void readFromDat()
+	{
+		ifstream *datKnjige, *datLjudi;
+		datKnjige = new ifstream();
+		datLjudi = new ifstream();
+		cout << "Unesite Ime datoteke iz koje se citaju Knjige" << endl;
+		bool check = 1;
+		string imeKnjiga = "knjige.txt", imeLjudi = "ljudi.txt";
+		while (check)
+		{
+			try{
+				//cin>>imeKnjiga; cin>>imeLjudi;
+				datKnjige->open(imeKnjiga);
+				datLjudi->open(imeLjudi);
+				if (datKnjige == nullptr || datLjudi == nullptr) throw new NoFile();
+				check = 0;
+			}
+			catch (NoFile *nf)
+			{
+				cout << nf;
+			}
+		}
+		*datLjudi >> num;
+		*datKnjige >> brKnjiga;
+		if (num <= 0 || brKnjiga <= 0) throw new BadNumber();
+		string s1, s2;
+		ljudi = new Person*[num];
+		for (int i = 0; i < num; i++)
+		{
+			*datLjudi >> s1; *datLjudi >> s2;
+			ljudi[i] = new Person(s1, s2);
+		}
+		knjige = new Book*[brKnjiga];
+		for (int i = 0; i < brKnjiga; i++)
+		{
+			int brar, god;
+			*datKnjige >> s1; //naziv knjige
+			*datKnjige >> god; //godina izdanja
+			*datKnjige >> s2; //naziv izdavaca 
+
+			*datKnjige >> brar;
+			if (brar <= 0) throw new BadNumber();
+			string *imena = new string[brar]; //broj autora
+			string *prezimena = new string[brar];
+			for (int j = 0; j < brar; j++){
+				*datKnjige >> imena[j]; //ime autora
+				*datKnjige >> prezimena[j];
+			}
+			int podatak; //podatak o izdanju
+			*datKnjige >> podatak;
+			string isbn, zanr, jezik;
+			bool tip;
+			*datKnjige >> tip;
+			*datKnjige >> isbn; 
+			*datKnjige >> zanr;
+			*datKnjige >> jezik;
+
+			//Book(BookCondition bc, BorrowingPosition *pp, string naz, int godinaizd, Autori *aut, string nazivIzd, int podatakOIZD, string isbnn, bool tip, string zanrr, string jezikk) :
+			knjige[i] = new Book(NIJEBILA, nullptr, s1, god, new Autori(brar, imena,prezimena), s2, podatak,isbn,tip,zanr,jezik);
+		}
+		datLjudi->close();
+		datKnjige->close();
+		datLjudi = datKnjige = nullptr;
+		*upis << " Citanje Ulaznih Podataka iz Datoteka" << endl;
+	}
+	void readFromKeyboard()
+	{
+		cout << "Prvo unesite broj ljudi koje kreirate i sve potrebne podatke za njih.";
+		cin >> num;
+		if (num <= 0) throw new BadNumber();
+		string s1, s2;
+		ljudi = new Person*[num];
+		for (int i = 0; i < num; i++)
+		{
+			cout << "Unesite Ime i Prezime Osobe: ";
+			cin >> s1; cin >> s2;
+			ljudi[i] = new Person(s1, s2);
+			cout << endl;
+		}
+		cout << "Sad unesite broj knjiga koje kreirate i sve potrebne podatke za njih.";
+		cin >> brKnjiga;
+		if (brKnjiga <= 0) throw new BadNumber();
+		knjige = new Book*[brKnjiga];
+		for (int i = 0; i < brKnjiga; i++)
+		{
+
+			cout << "Unesite sada Naziv knjige, Godinu Izdavanja, Naziv Izdavaca i Broj Autora respektivno" << endl;
+			string s1, s2; int brar, god;
+
+			cin >> s1;
+			cin >> god;
+			cin >> s2;
+
+			cin >> brar;
+			if (brar <= 0) throw new BadNumber();
+			string *imena = new string[brar]; //broj autora
+			string *prezimena = new string[brar];
+			cout << "Unesite Ime Pa Prezime Autora" << endl;
+			for (int j = 0; j < brar; j++){
+				cin >> imena[j]; //ime autora
+				cin >> prezimena[j]; //prezime
+			}
+			cout << "Unesite Podatak O Izdanju(int)" << endl;
+			int podatak;
+			cin >> podatak;
+			string isbn, zanr, jezik;
+			bool tip;
+			cout << "Unesite tip ISBN-a, 1 za 13-ocifreni, 0 za 10-ocireni" << endl;
+			cin >> tip;
+			if (tip != 0 && tip != 1) throw new BadNumber();
+			cout << "Unsite ISBN" << endl;
+			cin >> isbn;
+			if (tip && isbn.length() != 13 || !tip && isbn.length() != 10) 	throw new BadNumber();
+			cout << "Unesite zanr" << endl;
+			cin >> zanr;
+			cout << "Unesite jezik" << endl;
+			cin >> jezik;
+
+			//Book(BookCondition bc, BorrowingPosition *pp, string naz, int godinaizd, Autori *aut, string nazivIzd, int podatakOIZD, string isbnn, bool tip, string zanrr, string jezikk) :
+			knjige[i] = new Book(NIJEBILA, nullptr, s1, god, new Autori(brar, imena,prezimena), s2, podatak, isbn, tip, zanr, jezik);
+		}
+		*upis<< " Citanje Ulaznih Podataka sa Tastature" << endl;
+	}
+	int selection()
+	{
+
 		int menu = 0;
 		cout << "Unesite Neku Od Sledecih Opcija:" << endl;
 		cout << "1.Uclanjivanje Ljudi U Biblioteku" << endl;//
@@ -1001,45 +1271,58 @@ int main()
 		cout << "17.Stanje u biblioteci" << endl;
 		cout << "0.Izlaz Iz Programa" << endl;
 		cin >> menu; int a;
-		switch (menu){
+		if (menu <= 0) throw new BadNumber(); // || menu >= ?;
+		if (upis == nullptr || !upis->is_open()) upis->open("Dnevnik_Rada.txt");
+		if (rezim) *upis << "::ADMIN::";
+		*upis << currentDateTime();
+		switch (menu)
+		{
 		case 1:{ispisLjudi(ljudi, num, biblioteka, 1); break; }
 		case 12:{ispisLjudi(ljudi, num, biblioteka, 0); break; }
-		case 2:{ubacivanjeKnjiga(biblioteka, brKnjiga, knjige, 1); break; }
-		case 13:{ubacivanjeKnjiga(biblioteka, brKnjiga, knjige, 0); break; }
-		case 3:{biblioteka->allBooks(); break; }
-		case 4:{biblioteka->allMembers(); break; }
-		case 14:{biblioteka->allBorrowed(); break; }
-		case 5:{pozicija(knjige, brKnjiga); break; }
-		case 6:{ispisKnjiga(knjige, brKnjiga); cin >> a; cout << niz[knjige[a]->getCondition()]; break; }
-		case 7:{
-				   ispisKnjiga(knjige, brKnjiga);
-				   cin >> a; cout << "Unesite: " << endl;
-				   for (int i = 0; i < 6; i++)
-					   cout << i << "Za " << niz[i];
-				   int b; cin >> b;
-				   if (b < 0 || b >= 6) exit(-1);
-				   if (knjige[a]->getCondition() != 5) { knjige[a]->setCondition(nizz[b]); }
-				   break;
+		case 2:{ubacivanjeKnjiga(biblioteka, brKnjiga, knjige, 1); break; }/////////////
+		case 13:{ubacivanjeKnjiga(biblioteka, brKnjiga, knjige, 0); break; }/////////////
+		case 3:{biblioteka->allBooks(); *upis<< " Ispis Svih Knjiga U Biblioteci" << endl; break; }
+		case 4:{biblioteka->allMembers();*upis<<" Ispis Svih Clanova u Biblioteci" << endl; break; }
+		case 14:{biblioteka->allBorrowed(); *upis<<" Ispis Svih Pozajmica" << endl; break; }
+		case 5:{pozicija(knjige, brKnjiga);	*upis<< " Ispis Pozicije Knjige" << endl;break; }
+		case 6:{ispisKnjiga(knjige, brKnjiga); cin >> a; cout << niz[knjige[a]->getCondition()]; 
+			*upis << "Provera Stanja Odredjene Knjige" << endl; break; 
 		}
-		case 8:{biblioteka->allBorrowed(); break; }
-		case 9: {pretrazivanje_knjiga(biblioteka); break;
+		case 7:
+		{
+				  ispisKnjiga(knjige, brKnjiga);
+				  cin >> a; cout << "Unesite: " << endl;
+				  for (int i = 0; i < 6; i++)
+					  cout << i << "Za " << niz[i];
+				  int novo; cin >> novo;
+				  if (novo < 0 || novo >= 6) throw new BadNumber();
+				  BookCondition staro = (BookCondition)knjige[a]->getCondition();
+				  knjige[a]->setCondition(nizz[novo]);
+				  *upis << "Promena Stanja OdredjeneKnjige" << endl;
+				  history->push(new Promena_Stanja(a,(BookCondition)novo,staro));
+				  break;
 		}
+		case 8:{biblioteka->allBorrowed(); break; *upis << " Ispis Svih Pozajmica" << endl; }
+		case 9: {pretrazivanje_knjiga(biblioteka); break; }
 		case 10:{pretrazivanje_clanova(biblioteka); break; }
-		case 11:{
-					cout << "Izaberite Osobu Koja Pozajmljuje" << endl;
-					for (int i = 0; i < num; i++)
-					{
-						cout << "Broj: " << i << "Za: " << ljudi[i] << endl;
-					}
-					cin >> menu;
-					if (menu < 0 || menu >= num) exit(-1);
-					cout << "Izaberite sada prema IDu knjige odredjenu knjigu za pozajmljivanje" << endl;
-					biblioteka->allBooks();
-					int mn; cin >> mn;
-					//cout << "Unesite Od kad do kad zelite da pozajmite knjigu (Dan, Mesec Godina" << endl;
-					int dd, dd2, mm, mm2, yy, yy2; cin >> dd; cin >> mm; cin >> yy; cin >> dd2; cin >> mm2; cin >> yy2;
-					biblioteka->borrow(ljudi[menu]->myMemID(), mn, new Date(yy, mm, dd), new Date(yy2, mm2, dd2));
-					break;
+		case 11:
+		{
+				   cout << "Izaberite Osobu Koja Pozajmljuje" << endl;
+				   for (int i = 0; i < num; i++)
+				   {
+					   cout << "Broj: " << i << "Za: " << ljudi[i] << endl;
+				   }
+				   cin >> menu; //Osoba
+				   if (menu < 0 || menu >= num) throw new BadNumber();;
+				   cout << "Izaberite sada prema IDu knjige odredjenu knjigu za pozajmljivanje" << endl;
+				   biblioteka->allBooks();
+				   int knjiga; cin >> knjiga;
+				   //cout << "Unesite Od kad do kad zelite da pozajmite knjigu (Dan, Mesec Godina" << endl;
+				   int dd, dd2, mm, mm2, yy, yy2; cin >> dd; cin >> mm; cin >> yy; cin >> dd2; cin >> mm2; cin >> yy2;
+				   biblioteka->borrow(ljudi[menu]->myMemID(), knjiga, new Date(yy, mm, dd), new Date(yy2, mm2, dd2));///////////
+
+				   history->push(new Pozajmljivanje_Knjige(menu, knjiga, new Date(yy, mm, dd), new Date(yy2, mm2, dd2)));
+				   break;
 		}
 		case 15:
 		{
@@ -1049,7 +1332,7 @@ int main()
 					   cout << "Broj: " << i << "Za: " << ljudi[i] << endl;
 				   }
 				   cin >> menu;
-				   if (menu < 0 || menu >= num) exit(-1);
+				   if (menu < 0 || menu >= num)throw new BadNumber();;
 				   biblioteka->member_borrowings(ljudi[menu]->myMemID());
 				   break;
 		}
@@ -1061,10 +1344,10 @@ int main()
 					   cout << "Broj: " << i << "Za: " << ljudi[i] << endl;
 				   }
 				   cin >> menu;
-				   if (menu < 0 || menu >= num) exit(-1);
+				   if (menu < 0 || menu >= num) throw new BadNumber();;
 				   cout << "Uniesite ID knjige od interesa" << endl;
 				   biblioteka->allBooks();
-				   int mn; cin >> mn;
+				   int knjiga; cin >> knjiga;
 				   cout << "Unesite Trenutno stanje knjige(Izaberite Opciju)" << endl;
 				   for (int i = 0; i < 6; i++)
 				   {
@@ -1073,18 +1356,108 @@ int main()
 				   int st;
 				   cin >> st;
 				   BookCondition stanje = (BookCondition)nizz[st];
-				   biblioteka->returnBook(ljudi[menu]->myMemID(), mn, stanje);
+				   biblioteka->returnBook(ljudi[menu]->myMemID(), knjiga, stanje);///////////////
+				   history->push(new Vracanje_Knjige(menu,knjiga,stanje)); //MENU ILI LJUDI[MENU]->MYMEMID() ???
 				   break;
 		}
 		case 17:
 		{
 				   cout << "Ukupno Knjiga u Vlasnistvu Biblioteke:" << biblioteka->numOfBooks() << endl;
 				   cout << "Trenutno Pozajmljene" << biblioteka->pozajmljene() << endl;
-				   cout << "Istekao rok";
+				   cout << "Istekao rok";  biblioteka->search_Date(new Date(1, 1, 1)); cout << endl;////random date.
 				   cout << "Potrebno Zameniti" << biblioteka->zamena() << endl;
 		}
-		case 0: exit(0);
+		case 0:
+			return 0;
 		}
+		return 1;
+	}
+	void del()
+	{
+		delete biblioteka;
+
+		for (int i = 0; i < num; i++)
+			delete ljudi[i];
+		delete ljudi;
+
+		for (int i = 0; i < brKnjiga; i++)
+			delete knjige[i];
+		delete knjige;
+
+		biblioteka = nullptr;
+		knjige = nullptr;
+		ljudi = nullptr;
+		num = brKnjiga = 0;
+		if (dnevnik != nullptr) dnevnik->close();
+		if (upis != nullptr) upis->close();
+		dnevnik = nullptr;
+		upis = nullptr;
+		delete history;
+		history = nullptr;
+
+	}
+	void dnevnik_Ispis()
+	{
+		if (!rezim) return;
+		if (dnevnik != nullptr) dnevnik->close();
+		dnevnik->open("Dnevnik_Rada.txt");
+		if (dnevnik == nullptr) cout << "Nema Dnevnika Rada" << endl;
+		string s; *dnevnik >> s;
+		while (!dnevnik->eof())
+		{
+			for (int i = 0; i < 4 && !dnevnik->eof(); i++){
+				cout << s << " ";
+				*dnevnik >> s;
+			}
+			cout << endl;
+		}
+		dnevnik->close();
+	}
+public:
+	Main(int rez) :biblioteka(nullptr),rezim(rez){
+		upis = new ofstream();
+		dnevnik = new ifstream();
+	}
+	void start(){
+		history = new History();
+		cout << "Za kreiranje biblioteke potrebno je uneti podrazumevanu vrednost N" << endl;
+		int n; cin >> n;
+		if (n <= 0 || n > 100) throw new BadNumber();
+		biblioteka = new Library();
+		Library::setN(n);
+		cout << "Biblioteka je Kreirana." << endl;
+		cout << "Za ucitavanje Knjiga i clanova iz datoteke unesite 1\n za rucno unosenje podataka unesite 2.";
+		int choise; cin >> choise;
+		upis->open("Dnevnik_Rada.txt");
+		if (rezim) *upis << "::ADMIN::";
+		*upis << currentDateTime();
+		if (choise == 1) readFromDat();
+		if (choise == 2) readFromKeyboard();
+		while(selection());
+	}
+	~Main(){
+		del();
+	}
+};
+
+int main()
+{
+	cout << "Unesite 0 za Rad u normalnom rezimu(Nije dozvoljeno ispisivanje dnevnika rada) i 1 za Admin rezim rada " << endl;
+	bool rezim;
+	cin >> rezim;
+	try{
+		if (rezim != 0 && rezim != 1) throw new BadNumber();
+		Main *m = new Main(rezim);
+		m->start();
+		delete m;
+	}
+	catch (BadNumber *b)
+	{
+		cout << b;
+	}
+	catch (...)
+	{
+		cout << "***NEOCEKIVANA GRESKA***" << endl;
 	}
 	//********************************
 	//    //}
@@ -1151,6 +1524,5 @@ int main()
 	//    cout << "************" << endl;
 	//    biblioteka->search_2(datumi[2]);
 	//    biblioteka->search_3(UKLONJENA);
-	delete biblioteka;
 	//******************************
 }
