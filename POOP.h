@@ -382,6 +382,13 @@ class Result
 	Book **knjige;
 	int kap, num;
 public:
+	~Result(){ 
+		for (int i = 0; i < num; i++)
+			knjige[i] = nullptr;
+		delete knjige;
+		kap = num = 0;
+	}
+
 	void more()
 	{
 		int kapNew = 2 * kap;
@@ -404,6 +411,19 @@ public:
 		if (num == kap) more();
 		knjige[num++] = knj;
 	}
+	void operator+=(Result *r)
+	{
+		for (int i = 0; i < r->getNum(); i++)
+			if (!in((*r)[i]))	this->operator+=((*r)[i]);
+	}
+	bool in(Book *b1)
+	{
+		for (int i = 0; i < num; i++)
+			if (*b1 == *knjige[i]) return true;
+
+		return false;
+	}
+
 	int getNum()const { return num; }
 	friend ostream& operator<<(ostream &it, const Result *r)
 	{
@@ -412,6 +432,21 @@ public:
 			it << r->knjige[i];
 		}
 		return it;
+	}
+	void dismiss(int k)
+	{
+		if (num>0)
+		for (int i = k; i < num-1; i++)
+		{
+			knjige[i] = knjige[i + 1];
+		}
+		num--;
+	}
+	Book* operator[](int i)
+	{
+		if (i < num)
+			return knjige[i];
+		else return nullptr;
 	}
 	bool is_empty()const { return num == 0; }
 	Book** getAllBooks(){ return knjige; }
@@ -432,6 +467,13 @@ class BookCollection{
 		//string name;
 		Book *vector[T];
 	public:
+		void anyPublication(int year, Result *rez)
+		{
+			for (int i = 0; i < num; i++)
+			{
+				if (vector[i]->getYear() == year) *rez += vector[i];
+			}
+		}
 		bool IDin(int bookID)const {
 			for (int i = 0; i < num; i++)
 			{
@@ -659,14 +701,23 @@ public:
 		}
 		return result;
 	}
+	Result * search_publication(int year)
+	{
+		Result* result = new Result();
+		for (map<int, BookWrapper*>::iterator it = collection.begin(); it != collection.end(); ++it)
+		{
+			it->second->anyPublication(year, result);
+		}
+		return result;
+	}
+
 
 	Result* search_Author(string autor)
 	{
-		Result* result;
+		Result* result = new Result();
 		for (map<int, BookWrapper*>::iterator it = collection.begin(); it != collection.end(); ++it)
 		{
-			it->second->getAuthors()->any(autor);
-			
+			if (it->second->getAuthors()->any(autor)) it->second->fillResult(result);
 		}
 		return result;
 	}
@@ -819,10 +870,10 @@ class Library{
 		return books->lookAtBook(bookID);
 	}												//FileStorage *files;
 public:
-	void search_Author(string autor)
+	Result* search_Author(string autor)
 	{
 		Result *r = books->search_Author(autor);
-		cout << r;
+		return r;
 	}
 	void ispis_Dat(string cla="Clanovi.txt",string knji="Knjige.txt",string poz="Pozajmice.txt")
 	{
@@ -861,17 +912,23 @@ public:
 		for (unordered_map<int, Member*>::iterator it = members.begin(); it != members.end(); ++it)
 			delete it->second;
 	}
-	void search_Name_Book(string naziv, string nazizd = "", int godina = 0){
+	Result* search_Name_Book(string naziv, string nazizd = "", int godina = 0){
 		Result *r = books->search_Name_Book(naziv, nazizd, godina);
-		cout << r;
+		return r;
 	}
-	void search_Date(Date *d){
+	Result* search_Date(Date *d){
 		Result *r = books->search_Date(d);
-		cout << r;
+		return r;
 	}
-	void search_Condition(BookCondition c){
+	Result * search_publication(int year)
+	{
+		Result *r = books->search_publication(year);
+		return r;
+	}
+
+	Result* search_Condition(BookCondition c){
 		Result *r = books->search_Condition(c);
-		cout << r;
+		return r;
 	}
 	static void setN(int n){ N = n; }
 	void istekaoRok(Date *datum){
@@ -1032,6 +1089,7 @@ class Operation{
 protected:
 	static Library *biblioteka;
 public:
+	virtual ~Operation(){}
 	static void setLibrary(Library *l){ biblioteka = l; }
 	static void setLogging(bool adm)
 	{
@@ -1168,7 +1226,7 @@ public:
 		 
 		cout << "Ukupno Knjiga u Vlasnistvu Biblioteke:" << biblioteka->numOfBooks() << endl;
 		cout << "Trenutno Pozajmljene" << biblioteka->pozajmljene() << endl;
-		cout << "Istekao rok";  biblioteka->search_Date(new Date(1, 1, 1)); cout << endl;////random date.
+		cout << "Istekao rok";  cout<<biblioteka->search_Date(new Date(1, 1, 1)); cout << endl;////random date.
 		cout << "Potrebno Zameniti" << biblioteka->zamena() << endl;
 	}
 };
@@ -1195,6 +1253,7 @@ class PrintPosition : public ViewingOperation{
 	Book *knjiga;
 public:
 	PrintPosition(Book *b) :knjiga(b){}
+	~PrintPosition(){ knjiga = nullptr; }
 	string getString()const override{ return s; }
 	void log() override
 	{
@@ -1212,6 +1271,7 @@ class PrintState : public ViewingOperation{
 	Book *knjiga;
 public:
 	PrintState(Book *b) :knjiga(b){}
+	~PrintState(){ knjiga = nullptr; }
 	string getString()const override{ return s; }
 	void log() override
 	{
@@ -1264,7 +1324,6 @@ public:
 	}
 	void execute()
 	{
-		 
 		biblioteka->allBooks();
 	}
 };
@@ -1274,6 +1333,7 @@ class PrintResults :public ViewingOperation{
 	Result *rez;
 public:
 	PrintResults(Result *r):rez(r){}
+	~PrintResults(){ rez = nullptr; }
 	string getString()const override{ return s; }
 	void log() override
 	{
@@ -1294,6 +1354,7 @@ class AddingBook : public ModifyingOperation{
 	bool change;
 public:
 	AddingBook(Book* b) :knjiga(b){}
+	~AddingBook(){ knjiga = nullptr; }
 	string getString()const override{ return s; }
 	void log() override
 	{
@@ -1324,6 +1385,7 @@ class ResolvingBook : public ModifyingOperation{
 	int bookCondition;
 	bool change;
 public:
+	~ResolvingBook(){ knjiga = nullptr; }
 	ResolvingBook(Book* b) :knjiga(b), change(false){}
 	string getString()const override{ return s; }
 	void log() override
@@ -1348,6 +1410,7 @@ class UnsubscribeMember :public ModifyingOperation{
 	Person *person;
 	bool change;
 public:
+	~UnsubscribeMember(){ person = nullptr; }
 	UnsubscribeMember(Person *p) :person(p){}
 	string getString()const override{ return s; }
 	void log() override
@@ -1369,6 +1432,7 @@ class SubscribeMember :public ModifyingOperation{
 	Person *person;
 	bool change;
 public:
+	~SubscribeMember(){ person = nullptr; }
 	SubscribeMember(Person *p) :person(p){}
 	string getString()const override{ return s; }
 	void log() override
@@ -1411,8 +1475,8 @@ class BorrowingBook : public ModifyingOperation{
 	Date *from, *to;
 	bool change;
 public:
+	~BorrowingBook(){ delete from; delete to; }
 	BorrowingBook(int menu, int knjiga, Date *d1, Date *d2) :memberID(menu), bookID(knjiga), from(d1), to(d2){}
-	~BorrowingBook(){ delete from; from = nullptr; delete to; to = nullptr; }
 	string getString()const override{ return s; }
 	void log() override
 	{
@@ -1434,6 +1498,7 @@ class ChangingState : public ModifyingOperation{
 	Book *knjiga;
 	BookCondition staro;
 public:
+	~ChangingState(){ knjiga = nullptr; }
 	ChangingState(Book *knj) :knjiga(knj){}
 	string getString()const override{ return s; }
 	void log() override
@@ -1501,7 +1566,7 @@ public:
 		string name, publisher; cin >> name; cout << endl;
 		cout << "Unesite Izdavaca i godinu Izdanja" << endl;
 		int year; cin >> publisher; cin >> year;
-		biblioteka->search_Name_Book(name, publisher, year);
+		cout<<biblioteka->search_Name_Book(name, publisher, year);
 	}
 };
 
@@ -1518,7 +1583,7 @@ public:
 		 
 		cout << "Unesite Naziv Knjige, Kao Dzoker Znak Za Zamenu Odredjenog Slova Unesite $ " << endl;
 		string name; cin >> name; cout << endl;
-		biblioteka->search_Name_Book(name);
+		cout<<biblioteka->search_Name_Book(name);
 	}
 };
 
@@ -1535,7 +1600,7 @@ public:
 		 
 		cout << "Unesite Datum Pretrage, Dan, Mesec pa Godinu." << endl;
 		int dd, mm, yy; cin >> dd; cin >> mm; cin >> yy;
-		biblioteka->search_Date(new Date(yy, mm, dd));
+		cout<<biblioteka->search_Date(new Date(yy, mm, dd));
 	}
 };
 
@@ -1555,7 +1620,7 @@ public:
 			cout << i << "Za " << niz[i];
 		int b; cin >> b;
 		if (b < 0 || b >= 6) throw new BadNumber();
-		biblioteka->search_Condition(nizz[b]);
+		cout<<biblioteka->search_Condition(nizz[b]);
 	}
 };
 
@@ -1573,24 +1638,128 @@ public:
 	void execute()
 	{
 		 
-		biblioteka->search_Author(autor);
+		cout<<biblioteka->search_Author(autor);
 	}
 };
+
 class SearchPredicate
 {
+protected:
+	static Library *lib;
+
 public:
-	void find(Result* rez, Library *lib)
+	static void setLib(Library *l){ lib = l; }
+	virtual Result* operator()() = 0;
+};
+
+Library* SearchPredicate::lib = nullptr;
+
+class AuthorNamePredicate :public SearchPredicate
+{
+	string name;
+public:
+	AuthorNamePredicate(string n) :name(n){}
+	Result* operator()()override
 	{
-		;
+		Result *result;
+		result = lib->search_Author(name);
+		return result;
 	}
 };
+
+class PublicationYearPredicate : public SearchPredicate
+{
+	int number;
+public:
+	PublicationYearPredicate(int num) :number(num){}
+	Result *operator()()override
+	{
+		Result *result;
+		result = lib->search_publication(number);
+		return result;
+	}
+};
+
+class LogicalOperator : public SearchPredicate
+{
+protected:
+	SearchPredicate *sp1, *sp2;
+	LogicalOperator(SearchPredicate *s1, SearchPredicate*s2) :sp1(s1), sp2(s2){}
+public:
+	~LogicalOperator(){ delete sp1; delete sp2; }
+};
+
+class OR :public LogicalOperator
+{
+public:
+	OR(SearchPredicate *s1, SearchPredicate *s2) :LogicalOperator(s1, s2){}
+	Result* operator()()override
+	{
+		Result *result = new Result(), *r1, *r2;
+		r1 = (*sp1)();
+		r2 = (*sp2)();
+		*result += r1;
+		*result += r2;
+		delete r1;
+		delete r2;
+		return result;
+	}
+};
+
+class AND :public LogicalOperator
+{
+public:
+	AND(SearchPredicate *s1, SearchPredicate *s2) :LogicalOperator(s1, s2){}
+	Result * operator()()override
+	{
+		Result *result = new Result(), *r1, *r2;
+		r1 = (*sp1)();
+		r2 = (*sp2)();
+		for (int i = 0; i<r1->getNum(); i++)
+			if (r2->in((*r1)[i])) *result += (*r1)[i];
+		return result;
+	}
+};
+
+class NOT :public LogicalOperator
+{
+public:
+	NOT(SearchPredicate *s1, SearchPredicate *s2) :LogicalOperator(s1, s2){}
+	Result *operator()() override
+	{
+		Result *result = new Result(), *r1, *r2;
+		r1 = (*sp1)();
+		r2 = (*sp2)();
+		for (int i = 0; i<r1->getNum(); i++)
+			if (!r2->in((*r1)[i])) *result += (*r1)[i];
+		return result;
+	}
+};
+
+//class Search
+//{
+//	SearchPredicate **pred;
+//	int num, kap;
+//public:
+//	Search(int k) :kap(k), num(0)
+//	{
+//		pred = new	SearchPredicate*[kap];
+//	}
+//	void find()
+//	{
+//
+//		for (int i = 0; i < num; i++)
+//			(*pred[i])()
+//	}
+//};
 
 class SearchBooks_Combined : public SearchingOperation
 {
 	string s = "Kombinovana Pretraga Knjiga";
-	SearchPredicate *predicate;
+	SearchPredicate *combine;
 public:
-	SearchBooks_Combined(SearchPredicate *sp) :predicate(sp){}
+	~SearchBooks_Combined(){ delete combine; }
+	SearchBooks_Combined(SearchPredicate *sp) :combine(sp){}
 	string getString()const override{ return s; }
 	void log()
 	{
@@ -1599,7 +1768,8 @@ public:
 	void execute()
 	{
 		Result *rez;
-		predicate->find(rez, biblioteka);
+		rez=(*combine)();
+		cout << rez;
 	}
 };
 
@@ -1646,6 +1816,7 @@ class CompositeOperation : public Operation
 	int kap, num;
 	string s = "";
 public:
+	~CompositeOperation(){ for (int i = 0; i < num; i++) delete ops[i]; }
 	CompositeOperation(int n) :kap(n), num(0)
 	{
 		ops = new Operation*[n];
@@ -1747,10 +1918,67 @@ class Main{
 		if (a < 0 || a >= broj) throw new BadNumber();
 			knjige[a]->position();
 	}
-	void makePredicate(SearchPredicate *sp)
+	SearchPredicate* makePredicate(SearchPredicate *sp)
 	{
-		//sp = new SearchPredicate()
-		;
+		int menu;
+		SearchPredicate *sp1,*sp2;
+		cout << "Unesite 1. Pretragu Na Osnovu Imena Autora, 2. Pretragu Na osnovu Datuma Publikacije" << endl;
+		cin >> menu;
+			switch (menu)
+			{
+			case 1:
+			{
+					  cout << "Unesite Ime Autora $ predstavlja Dzoker Znak" << endl;
+					  string autor; cin >> autor;
+					  sp1 = new AuthorNamePredicate(autor);
+					  break;
+			}
+			case 2:
+			{
+					  cout << "Unesite Godinu Publikacije " << endl;
+					  int year; cin >> year;
+					  sp1 = new PublicationYearPredicate(year);
+					  break;
+			}
+
+			}
+			cout << "Sada za drugu Pretragu:" << endl;
+			cout << "Unesite 1. Pretragu Na Osnovu Imena Autora, 2. Pretragu Na osnovu Datuma Publikacije" << endl;
+			cin >> menu;
+			switch (menu)
+			{
+			case 1:
+			{
+					  cout << "Unesite Ime Autora $ predstavlja Dzoker Znak" << endl;
+					  string autor; cin >> autor;
+					  sp2 = new AuthorNamePredicate(autor);
+					  break;
+			}
+			case 2:
+			{
+					  cout << "Unesite Godinu Publikacije " << endl;
+					  int year; cin >> year;
+					  sp2 = new PublicationYearPredicate(year);
+					  break;
+			}
+
+			}
+		cout << "Unesite 1 za AND / 2 za OR / 3 za NOT" << endl;
+		cin >> menu;
+		switch (menu)
+		{
+		case 1:
+			sp = new AND(sp1, sp2);
+			break;
+		case 2:
+			sp = new OR(sp1, sp2);
+			break;
+
+		case 3:
+			sp = new NOT(sp1, sp2);
+			break;
+		}
+		return sp;
 	}
 	void pretrazivanje_knjiga(Library *biblioteka)
 	{
@@ -1786,7 +2014,7 @@ class Main{
 		case 4:
 		{
 				  SearchPredicate *sp = nullptr;
-				  makePredicate(sp);
+				  sp=makePredicate(sp);
 				  oe->submitOperation(new SearchBooks_Combined(sp));
 				  break;
 		}
@@ -1961,8 +2189,8 @@ class Main{
 		case 3:{oe->submitOperation(new PrintBooks()); oe->run(); break; }
 		case 4:{ oe->submitOperation(new PrintMembers()); oe->run(); break; }
 		case 14:{oe->submitOperation(new PrintBorrowings()); oe->run();; break; }
-		case 5:{pozicija(knjige, brKnjiga);break; }
-		case 6:{ispisKnjiga(knjige, brKnjiga); cin >> a; 
+		case 5:{pozicija(knjige, brKnjiga); break; }
+		case 6:{ispisKnjiga(knjige, brKnjiga); cin >> a;
 			oe->submitOperation(new PrintState(knjige[a]));
 			oe->run();
 			break;
@@ -1989,9 +2217,9 @@ class Main{
 				   biblioteka->allBooks();
 				   int knjiga; cin >> knjiga;
 				   cout << "Unesite Od kad do kad zelite da pozajmite knjigu (Dan, Mesec Godina)" << endl;
-					int dd, dd2, mm, mm2, yy, yy2; cin >> dd; cin >> mm; cin >> yy; cin >> dd2; cin >> mm2; cin >> yy2;
-					oe->submitOperation(new BorrowingBook(ljudi[menu]->myMemID(), knjiga, new Date(yy, mm, dd), new Date(yy2, mm2, dd2))); //////////
-					oe->run();
+				   int dd, dd2, mm, mm2, yy, yy2; cin >> dd; cin >> mm; cin >> yy; cin >> dd2; cin >> mm2; cin >> yy2;
+				   oe->submitOperation(new BorrowingBook(ljudi[menu]->myMemID(), knjiga, new Date(yy, mm, dd), new Date(yy2, mm2, dd2))); //////////
+				   oe->run();
 				   break;
 		}
 		case 15:
@@ -2004,6 +2232,18 @@ class Main{
 				   cin >> menu;
 				   if (menu < 0 || menu >= num)throw new BadNumber();;
 				   oe->submitOperation(new PrintMemberBorrowings(ljudi[menu]->myMemID()));
+				   oe->run();
+				   break;
+		}
+		case 18:
+
+			{
+				oe->undo();
+				break;
+			}
+		case 19:
+		{
+				   oe->submitOperation(new DataWrite());
 				   oe->run();
 				   break;
 		}
@@ -2035,22 +2275,12 @@ class Main{
 		{
 				   oe->submitOperation(new LibraryState());
 				   oe->run();
-		}
-		case 18:
-		{
-				   oe->undo();
-				   break;
-		}
-		case 19:
-		{
-				   oe->submitOperation(new DataWrite());
-				   oe->run();
 				   break;
 		}
 		case 0:
 			return 0;
 		}
-		return 1;
+			return 1;
 	}
 	void del()
 	{
@@ -2101,6 +2331,7 @@ public:
 		if (n <= 0 || n > 100) throw new BadNumber();
 		biblioteka = new Library();
 		Library::setN(n);
+		SearchPredicate::setLib(biblioteka);
 		Operation::setLibrary(biblioteka);
 		cout << "Biblioteka je Kreirana." << endl;
 		cout << "Za ucitavanje Knjiga i clanova iz datoteke unesite 1\n za rucno unosenje podataka unesite 2.";
